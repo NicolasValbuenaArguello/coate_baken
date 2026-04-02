@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Arquitectura Plataforma Inteligencia Territorial</title>
+
+<style>
+
+body{
+font-family: Arial, Helvetica, sans-serif;
+background:#0f172a;
+color:white;
+margin:0;
+padding:0;
+}
+
+h1{
+text-align:center;
+padding:20px;
+color:#38bdf8;
+}
+
+.container{
+display:flex;
+flex-direction:column;
+align-items:center;
+gap:25px;
+padding:20px;
+}
+
+.layer{
+width:80%;
+border-radius:10px;
+padding:20px;
+box-shadow:0 0 10px rgba(0,0,0,0.4);
+transition:0.3s;
+}
+
+.layer:hover{
+transform:scale(1.02);
+}
+
+.front{
+background:#1e293b;
+border-left:6px solid #38bdf8;
+}
+
+.gateway{
+background:#1e293b;
+border-left:6px solid #22c55e;
+}
+
+.micro{
+background:#1e293b;
+border-left:6px solid #f59e0b;
+}
+
+.data{
+background:#1e293b;
+border-left:6px solid #a855f7;
+}
+
+.visual{
+background:#1e293b;
+border-left:6px solid #ef4444;
+}
+
+.title{
+font-size:20px;
+margin-bottom:10px;
+}
+
+.services{
+display:flex;
+flex-wrap:wrap;
+gap:15px;
+}
+
+.box{
+background:#0f172a;
+padding:10px 15px;
+border-radius:8px;
+border:1px solid #334155;
+cursor:pointer;
+}
+
+.box:hover{
+background:#1e40af;
+}
+
+.arrow{
+font-size:30px;
+color:#38bdf8;
+}
+
+.info{
+position:fixed;
+right:20px;
+top:20px;
+width:260px;
+background:#020617;
+padding:20px;
+border-radius:10px;
+border:1px solid #38bdf8;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Arquitectura Plataforma de Análisis Territorial</h1>
+
+<div class="container">
+
+<div class="layer front">
+<div class="title">Frontend</div>
+
+<div class="services">
+
+<div class="box" onclick="info('Dashboard Angular','Panel principal de visualización de datos y mapas.')">
+Angular Dashboard
+</div>
+
+<div class="box" onclick="info('Mapas interactivos','Visualización geoespacial de eventos.')">
+Mapas
+</div>
+
+<div class="box" onclick="info('Alertas','Sistema de alertas en tiempo real.')">
+Alertas
+</div>
+
+</div>
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="layer gateway">
+
+<div class="title">API Gateway</div>
+
+<div class="services">
+
+<div class="box" onclick="info('FastAPI','Gestiona autenticación, seguridad y distribución de solicitudes.')">
+FastAPI
+</div>
+
+</div>
+
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="layer micro">
+
+<div class="title">Microservicios</div>
+
+<div class="services">
+
+<div class="box" onclick="info('Integración APIs','Consume APIs externas como noticias, redes sociales y sensores.')">
+Integración APIs
+</div>
+
+<div class="box" onclick="info('Procesamiento','Normaliza y limpia datos.')">
+Procesamiento Datos
+</div>
+
+<div class="box" onclick="info('Geoespacial','Procesamiento geográfico con GeoPandas y PostGIS.')">
+Geoespacial
+</div>
+
+<div class="box" onclick="info('IA','Modelos de predicción y detección de patrones.')">
+IA / Predicción
+</div>
+
+<div class="box" onclick="info('Reportes','Generación automática de reportes.')">
+Reportes
+</div>
+
+</div>
+
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="layer data">
+
+<div class="title">Capa de Datos</div>
+
+<div class="services">
+
+<div class="box" onclick="info('PostgreSQL','Base de datos principal del sistema.')">
+PostgreSQL
+</div>
+
+<div class="box" onclick="info('PostGIS','Extensión geoespacial para análisis territorial.')">
+PostGIS
+</div>
+
+<div class="box" onclick="info('Redis','Cache y procesamiento en tiempo real.')">
+Redis
+</div>
+
+</div>
+
+</div>
+
+<div class="arrow">↓</div>
+
+<div class="layer visual">
+
+<div class="title">Visualización y Análisis</div>
+
+<div class="services">
+
+<div class="box" onclick="info('Mapas analíticos','Generación de mapas estadísticos.')">
+Mapas Analíticos
+</div>
+
+<div class="box" onclick="info('Dashboards','Visualización de indicadores.')">
+Dashboard
+</div>
+
+<div class="box" onclick="info('Alertas','Sistema de monitoreo en tiempo real.')">
+Alertas Inteligentes
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div class="info" id="infoBox">
+<h3>Información</h3>
+<p>Haz clic en un componente para ver su función.</p>
+</div>
+
+<script>
+
+function info(titulo,texto){
+
+document.getElementById("infoBox").innerHTML = 
+"<h3>"+titulo+"</h3><p>"+texto+"</p>";
+
+}
+
+</script>
+
+</body>
+</html>
