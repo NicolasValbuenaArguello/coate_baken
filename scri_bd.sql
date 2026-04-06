@@ -3,6 +3,8 @@
 -- Version consolidada y organizada por dependencias
 -- ============================================================
 
+SET client_min_messages TO WARNING;
+
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ============================================================
@@ -343,8 +345,8 @@ CREATE TABLE IF NOT EXISTS proyectos (
     usuario_creacion VARCHAR(150),
     unidad_usuario_final VARCHAR(150),
     CONSTRAINT chk_proyectos_trl CHECK (trl IS NULL OR trl BETWEEN 1 AND 9),
-    CONSTRAINT chk_proyectos_tiempo CHECK (tiempo_ejecucion_meses IS NULL OR tiempo_ejecucion_meses >= 0),
-    CONSTRAINT chk_proyectos_presupuesto CHECK (presupuesto IS NULL OR presupuesto >= 0)
+    CONSTRAINT chk_proyectos_tiempo CHECK (tiempo_ejecucion_meses IS NULL OR tiempo_ejecucion_meses >= 0)
+
 );
 create table if not exists presupuesto_proyecto (
     id SERIAL PRIMARY KEY,
@@ -737,9 +739,16 @@ create table if not exists carperta_documentos_matriz (
     nombre VARCHAR(150) NOT NULL,
     ruta text NOT NULL,
     descripcion TEXT,
+    estado boolean DEFAULT TRUE,
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE IF EXISTS carperta_documentos_matriz
+ADD COLUMN IF NOT EXISTS estado boolean DEFAULT TRUE;
+UPDATE carperta_documentos_matriz
+SET estado = TRUE
+WHERE estado IS NULL;
 CREATE INDEX IF NOT EXISTS idx_carperta_documentos_matriz_nombre ON carperta_documentos_matriz(nombre);
+CREATE INDEX IF NOT EXISTS idx_carperta_documentos_matriz_estado ON carperta_documentos_matriz(estado);
 create table if not exists documento_carpeta_proyecto (
     id SERIAL PRIMARY KEY,
     carpeta_id INTEGER REFERENCES carperta_documentos_matriz(id) ON DELETE CASCADE,
@@ -758,6 +767,8 @@ create table if not exists carpeta_documentos_proyecto (
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_carpeta_documentos_proyecto_carpeta ON carpeta_documentos_proyecto(carpeta_id);
+
+
 -- ============================================================
 -- VISTAS
 -- ============================================================
@@ -1046,3 +1057,5 @@ FROM roles r
 CROSS JOIN paginas p
 WHERE r.nombre = 'SUPER'
 ON CONFLICT DO NOTHING;
+
+SET client_min_messages TO NOTICE;

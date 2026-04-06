@@ -154,12 +154,25 @@ def obtener_o_crear_unidad(cur, nivel_unidad: str | None, unidad_usuario: str | 
 def obtener_datos_personal(cur, cc: int):
     cur.execute("""
     SELECT
+        pn.id,
         pn.apellidos_nombres,
         COALESCE(pn.correo_institucional, pn.correo_personal) AS correo,
-        pn.grado,
+        g.id AS grado_id,
+        g.nombre AS grado,
+        g.abreviatura AS grado_abreviatura,
         pn.nivel_unidad,
-        pn.unidad_usuario
+        pn.unidad_usuario,
+        fp.ruta_foto
     FROM personal_novedades pn
+    LEFT JOIN grados g
+      ON g.id = pn.id_grado
+    LEFT JOIN LATERAL (
+        SELECT ruta_foto
+        FROM fotos_personal
+        WHERE id_personal_novedad = pn.id
+        ORDER BY fecha_subida DESC, id DESC
+        LIMIT 1
+    ) fp ON TRUE
     WHERE pn.cc = %s
     ORDER BY pn.fecha_creacion DESC, pn.id DESC
     LIMIT 1
@@ -173,12 +186,33 @@ def obtener_datos_personal(cur, cc: int):
         )
 
     return {
-        "nombre_completo": row[0],
-        "correo": row[1],
-        "grado": row[2],
-        "nivel_unidad": row[3],
-        "unidad_usuario": row[4]
+        "id_personal_novedad": row[0],
+        "nombre_completo": row[1],
+        "correo": row[2],
+        "grado_id": row[3],
+        "grado": row[4],
+        "grado_abreviatura": row[5],
+        "nivel_unidad": row[6],
+        "unidad_usuario": row[7],
+        "foto": construir_url_archivo(row[8]),
+        "foto_path": row[8],
+        "cc": cc,
     }
+
+
+# =========================================================
+# AUTOLLENADO DESDE PERSONAL
+# =========================================================
+
+@router.get("/api/usuarios/autofill/{cc}")
+@router.get("/api/usuarios/personal/{cc}")
+async def autollenar_usuario_desde_personal(
+    cc: int,
+    payload: dict = Depends(verificar_token)
+):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            return obtener_datos_personal(cur, cc)
 
 
 # =========================================================
@@ -213,8 +247,12 @@ async def crear_usuario(
 
         with conn.cursor() as cur:
             rol_asignado_por_funcion = False
+            foto_personal_path = None
 
             if cc is not None:
+                datos_personal = obtener_datos_personal(cur, cc)
+                foto_personal_path = datos_personal.get("foto_path")
+
                 cur.execute("""
                 SELECT crear_usuario_desde_personal(%s, %s, %s, %s, %s)
                 """, (
@@ -254,7 +292,7 @@ async def crear_usuario(
                     correo,
                     usuario,
                     password_hash,
-                    grado_id,
+                    id_grado,
                     id_unidad,
                     activo
                 )
@@ -289,6 +327,13 @@ async def crear_usuario(
                 SET foto=%s
                 WHERE id=%s
                 """,(ruta,usuario_id))
+            elif foto_personal_path:
+
+                cur.execute("""
+                UPDATE usuarios
+                SET foto=%s
+                WHERE id=%s
+                """, (foto_personal_path, usuario_id))
 
             # =========================
             # ROL
@@ -347,17 +392,17 @@ async def usuarios(payload: dict = Depends(verificar_token)):
             cur.execute("""
             SELECT
                 u.id,
-                u.nombre_completo,
+                COALESCE(pn.apellidos_nombres, u.usuario),
                 u.usuario,
-                u.correo,
+                COALESCE(pn.correo_institucional, pn.correo_personal),
                 u.foto,
                 g.nombre,
-                un.nivel,
-                un.sigla,
+                pn.nivel_unidad,
+                pn.unidad_usuario,
                 u.activo
             FROM usuarios u
-            LEFT JOIN grados g ON g.id = u.grado_id
-            LEFT JOIN unidades un ON un.id = u.id_unidad
+            LEFT JOIN personal_novedades pn ON pn.id = u.id_personal_novedad
+            LEFT JOIN grados g ON g.id = pn.id_grado
             """)
 
             rows = cur.fetchall()
@@ -392,14 +437,14 @@ async def usuarios_permisos(payload: dict = Depends(verificar_token)):
             cur.execute("""
                 SELECT
                     u.id,
-                    u.nombre_completo,
+                    COALESCE(pn.apellidos_nombres, u.usuario),
                     u.usuario,
-                    u.correo,
+                    COALESCE(pn.correo_institucional, pn.correo_personal),
                     u.foto,
 
-                    u.grado_id,
-                    un.nivel,
-                    un.sigla,
+                    pn.id_grado,
+                    pn.nivel_unidad,
+                    pn.unidad_usuario,
                     u.activo,
 
                     g.nombre,
@@ -417,11 +462,11 @@ async def usuarios_permisos(payload: dict = Depends(verificar_token)):
 
                 FROM usuarios u
 
-                LEFT JOIN grados g
-                ON g.id = u.grado_id
+                LEFT JOIN personal_novedades pn
+                ON pn.id = u.id_personal_novedad
 
-                LEFT JOIN unidades un
-                ON un.id = u.id_unidad
+                LEFT JOIN grados g
+                ON g.id = pn.id_grado
 
                 LEFT JOIN usuario_rol ur
                 ON ur.usuario_id = u.id
@@ -703,7 +748,17 @@ async def actualizar_usuario(
     with get_conn() as conn:
 
         with conn.cursor() as cur:
-            unidad_id = obtener_o_crear_unidad(cur, nivel_unidad, unidad_usuario)
+            cur.execute("""
+            SELECT id_personal_novedad
+            FROM usuarios
+            WHERE id=%s
+            """, (usuario_id,))
+
+            row_usuario = cur.fetchone()
+            if not row_usuario:
+                raise HTTPException(status_code=404, detail="Usuario no existe")
+
+            id_personal_novedad = row_usuario[0]
 
             # =========================
             # ACTUALIZAR USUARIO
@@ -716,21 +771,13 @@ async def actualizar_usuario(
                 cur.execute("""
                 UPDATE usuarios
                 SET
-                    nombre_completo=%s,
-                    correo=%s,
                     usuario=%s,
                     password_hash=%s,
-                    grado_id=%s,
-                    id_unidad=%s,
                     activo=COALESCE(%s,activo)
                 WHERE id=%s
                 """,(
-                    nombre_completo,
-                    correo,
                     usuario,
                     password_hash,
-                    grado_id,
-                    unidad_id,
                     activo,
                     usuario_id
                 ))
@@ -740,22 +787,66 @@ async def actualizar_usuario(
                 cur.execute("""
                 UPDATE usuarios
                 SET
-                    nombre_completo=%s,
-                    correo=%s,
                     usuario=%s,
-                    grado_id=%s,
-                    id_unidad=%s,
                     activo=COALESCE(%s,activo)
                 WHERE id=%s
                 """,(
-                    nombre_completo,
-                    correo,
                     usuario,
-                    grado_id,
-                    unidad_id,
                     activo,
                     usuario_id
                 ))
+
+            # ============================================
+            # SINCRONIZAR DATOS DE PERFIL EN PERSONAL
+            # ============================================
+
+            if id_personal_novedad:
+                cur.execute("""
+                UPDATE personal_novedades
+                SET
+                    apellidos_nombres=%s,
+                    correo_institucional=%s,
+                    id_grado=%s,
+                    nivel_unidad=%s,
+                    unidad_usuario=%s
+                WHERE id=%s
+                """, (
+                    nombre_completo,
+                    correo,
+                    grado_id,
+                    nivel_unidad,
+                    unidad_usuario,
+                    id_personal_novedad
+                ))
+            else:
+                cur.execute("""
+                INSERT INTO personal_novedades
+                (
+                    id_grado,
+                    apellidos_nombres,
+                    correo_institucional,
+                    nivel_unidad,
+                    unidad_usuario,
+                    usuario_ingreso
+                )
+                VALUES (%s,%s,%s,%s,%s,%s)
+                RETURNING id
+                """, (
+                    grado_id,
+                    nombre_completo,
+                    correo,
+                    nivel_unidad,
+                    unidad_usuario,
+                    payload.get("sub") if isinstance(payload, dict) else None
+                ))
+
+                id_personal_novedad_nuevo = cur.fetchone()[0]
+
+                cur.execute("""
+                UPDATE usuarios
+                SET id_personal_novedad=%s
+                WHERE id=%s
+                """, (id_personal_novedad_nuevo, usuario_id))
 
             # =========================
             # FOTO

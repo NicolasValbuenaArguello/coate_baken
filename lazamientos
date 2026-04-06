@@ -2,6 +2,8 @@ python -m uvicorn login.main:app --reload --port 8000
 python -m uvicorn usuarios.usuarios:app --reload --port 8001
 python -m uvicorn personal.personal:app --reload --port 8002
 python -m uvicorn areas_subareas.areas:app --reload --port 8003
+python -m uvicorn carpetas.carpetas:app --reload --port 8004
+python -m uvicorn proyectos.proyectos:app --reload --port 8005
 
 
 
