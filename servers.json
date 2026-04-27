@@ -1,0 +1,16 @@
+[
+    {
+        "nombre": "fron",
+        "comando": "python  ./front_producion/servidor_front.py",
+        "puerto": 52198,
+        "health": "/",
+        "tipo": "script"
+    },
+    {
+        "nombre": "login",
+        "comando": "python -m uvicorn login.main:app  --port 8000",
+        "puerto": 8000,
+        "health": "/docs",
+        "tipo": "api"
+    }
+]

@@ -29,6 +29,7 @@ DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 FILES_BASE_URL = os.getenv("FILES_BASE_URL", "http://localhost:9000/files").rstrip("/")
+FILES_MATRIZ_BASE_URL = os.getenv("FILES_MATRIZ_BASE_URL", "http://localhost:9000/files-matriz").rstrip("/")
 CARPETA_MATRIZ_BASE_DIR = os.path.abspath(
     os.getenv(
         "CARPETA_MATRIZ_BASE_DIR",
@@ -89,6 +90,45 @@ def ruta_relativa_a_fisica(ruta_relativa: str) -> str:
         raise HTTPException(status_code=400, detail="Ruta de carpeta invalida")
 
     return ruta_fisica
+
+
+def construir_url_archivo(ruta_relativa: str) -> str:
+    ruta_normalizada = ruta_relativa.replace("\\", "/").strip().lstrip("/")
+
+    if "/carpeta_matriz_documentos/" in ruta_normalizada:
+        ruta_normalizada = ruta_normalizada.split("/carpeta_matriz_documentos/", 1)[1]
+        return f"{FILES_MATRIZ_BASE_URL}/{ruta_normalizada.lstrip('/')}"
+
+    if ruta_normalizada.startswith("carpeta_matriz_documentos/"):
+        ruta_normalizada = ruta_normalizada[len("carpeta_matriz_documentos/"):]
+        return f"{FILES_MATRIZ_BASE_URL}/{ruta_normalizada.lstrip('/')}"
+
+    return f"{FILES_BASE_URL}/{ruta_normalizada}"
+
+
+def listar_archivos_directos(ruta_relativa: str) -> list[dict]:
+    ruta_fisica = ruta_relativa_a_fisica(ruta_relativa)
+
+    if not os.path.isdir(ruta_fisica):
+        return []
+
+    archivos = []
+
+    for nombre in sorted(os.listdir(ruta_fisica), key=str.lower):
+        ruta_archivo_fisica = os.path.join(ruta_fisica, nombre)
+
+        if not os.path.isfile(ruta_archivo_fisica):
+            continue
+
+        ruta_archivo_relativa = f"{ruta_relativa.rstrip('/')}/{nombre}".replace("\\", "/")
+        archivos.append({
+            "nombre": nombre,
+            "ruta": ruta_archivo_relativa,
+            "url": construir_url_archivo(ruta_archivo_relativa),
+            "tamano_bytes": os.path.getsize(ruta_archivo_fisica),
+        })
+
+    return archivos
 
 
 def tabla_tiene_columna(cur, tabla: str, columna: str) -> bool:
@@ -263,8 +303,7 @@ async def listar_carpetas(
                     estado,
                     creado_en
                 FROM carperta_documentos_matriz
-                WHERE estado = TRUE
-                ORDER BY creado_en DESC
+                ORDER BY estado DESC, creado_en DESC
                 """)
             else:
                 cur.execute("""
@@ -323,7 +362,7 @@ async def arbol_carpetas(
                 cur.execute("""
                 SELECT id,nombre,ruta,descripcion,estado
                 FROM carperta_documentos_matriz
-                WHERE estado = TRUE
+                ORDER BY estado DESC, creado_en DESC, id DESC
                 """)
             else:
                 cur.execute("""
@@ -364,11 +403,13 @@ async def arbol_carpetas(
                         "id": d[0],
                         "nombre": d[1],
                         "ruta": d[2],
+                        "archivos": listar_archivos_directos(d[2]),
                         "subcarpetas": [
                             {
                                 "id": s[0],
                                 "nombre": s[1],
-                                "ruta": s[2]
+                                "ruta": s[2],
+                                "archivos": listar_archivos_directos(s[2])
                             } for s in subcarpetas
                         ]
                     })
